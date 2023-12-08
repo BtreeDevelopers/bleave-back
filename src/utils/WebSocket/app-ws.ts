@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import querystring from 'node:querystring';
 import loggedModel from '@/resources/models/loggedModel';
+import conversasModel from '@/resources/models/conversasModel';
 
 class SocketFactory {
     public wss: any;
@@ -48,7 +49,6 @@ class SocketFactory {
                     let m = {
                         message: 'Welcome New Client!',
                         id: id,
-                        ip: ip,
                     };
                     return JSON.stringify(m);
                 }
@@ -57,17 +57,27 @@ class SocketFactory {
                     req.socket.remoteAddress,
                 );
 
-                ws.on('message', (message: any) => {
+                ws.on('message', async (message: any) => {
                     const clients = SocketFactory.instance.wss.clients;
-                    let dat = JSON.parse(message);
+                    let messageFromUser = JSON.parse(message);
                     let op = {
-                        sender_id: dat.sender_id,
-                        reciver_id: dat.reciver_id,
-                        message: dat.message,
+                        idConversa: messageFromUser.idConversa,
+                        idSender: messageFromUser.idSender,
+                        texto: messageFromUser.texto,
+                        timestamps: Date.now(),
                     };
-
                     // salvo a mensagem no banco
+                    const conversaUpdate = await conversasModel.updateOne(
+                        { _id: op.idConversa },
+                        { $push: { mensagens: op } },
+                    );
+
                     // let user[] = getlist of recivers if conversaID = dat.conversID
+                    const conversa = await conversasModel.findOne({
+                        _id: op.idConversa,
+                    });
+
+                    const membros = conversa?.membros;
 
                     clients.forEach(function each(client: any) {
                         if (
@@ -75,9 +85,11 @@ class SocketFactory {
                             client.readyState === WebSocket.OPEN
                         ) {
                             //client.id in user[]
-                            if (client.id == op.reciver_id) {
-                                client.send(JSON.stringify(op));
-                            }
+                            membros?.forEach((element) => {
+                                if (client.id == element) {
+                                    client.send(JSON.stringify(op));
+                                }
+                            });
                         }
                     });
                 });

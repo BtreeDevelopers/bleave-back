@@ -31,7 +31,7 @@ class App {
     public start(): void {
         this.initialiseMiddleware();
         this.initialiseControllers(this.controllers);
-        //this.initialiseDatabaseConnection();
+        this.initialiseDatabaseConnection();
     }
 
     private initialiseMiddleware(): void {
