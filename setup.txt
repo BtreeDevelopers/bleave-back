@@ -1,0 +1,326 @@
+npm init -y
+npm i -D typescript tsc-watch eslint prettier eslint-config-prettier eslint-plugin-prettier @typescript-eslint/parser @typescript-eslint/eslint-plugin @types/node @types/express
+npm i express dotenv
+
+npx tsc --init
+
+* Change the tsconfig.json:
+"baseUrl": "./src",
+"outDir": "dist", 
+ "resolveJsonModule": true,
+"paths": {
+      "@/resources/*": ["resources/*"],
+      "@/utils/*": ["utils/*"],
+      "@/middleware/*": ["middleware/*"],
+},
+
+* Scripts:
+    "start": "node dist/index.js",
+    "dev": "tsc-watch --onSuccess \"node ./dist/index.js\"",
+    "build": "tsc",
+    "postinstall": "npm run build"
+
+Create file .eslintrc.js
+Create file .prettierrc.js
+Create file .gitignore
+
+It may appears an error on tsconfig.json file, 
+it happen because is needed to have at 
+least 1 .ts file on the baseUrl folder,
+ the file name must be index.ts, we solve this bellow
+
+npm i module-alias
+npm i --save-dev @types/module-alias
+
+* In the package.json, config the module-alias:
+"_moduleAliases": {
+    "@/resources": "dist/resources",
+    "@/utils": "dist/utils",
+    "@/middleware": "dist/middleware"
+}
+
+Create the folder src and the inner folders middleware, utils,resources
+Create the files app.ts and index.ts
+
+
+npm i cors morgan helmet
+npm i --save-dev @types/cors
+npm i --save-dev @types/morgan
+
+morgan => log of HTTP requisitions
+helmet => set HTTP headers
+
+npm i express zod --save
+npm i @types/express --save-dev
+
+npm i mongoose
+
+npm i bcryptjs
+npm i --save-dev @types/bcryptjs
+
+npm i multer
+npm i --save-dev @types/multer
+
+npm i jsonwebtoken
+npm i --save-dev @types/jsonwebtoken
+
+create the function genetareToken, it can be found in utils/Auth/jwt.auth.ts
+
+import jwt from 'jsonwebtoken';
+
+function generateToken(params={}): string{
+    return jwt.sign(
+        params,
+        String(process.env.JWT_SECRET),
+        {
+            expiresIn: '1 day'
+        }
+    )
+}
+export default generateToken;
+
+
+
+
+create the middleware JWT, can be found in middleware/auth.middleware.ts
+
+import { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+
+const auth = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<any> => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).json({ erro: 'Token not found' });
+    } else {
+        const parts = authHeader.split(' ');
+        if (!(parts.length === 2)) {
+            return res.status(401).json({ erro: 'Token not found' });
+        } else {
+            const [scheme, token] = parts;
+
+            if (!/^Bearer$/i.test(scheme)) {
+                return res.status(401).json({ erro: 'Token seems broken' });
+            }
+            jwt.verify(
+                token,
+                String(process.env.JWT_SECRET),
+                (err, decoded: any) => {
+                    if (err) {
+                        return res.status(401).json({ erro: 'Token unvalid' });
+                    }
+                    req.userId = decoded.id;
+                    return next();
+                }
+            );
+        }
+    }
+};
+
+export default auth;
+
+
+
+
+
+Is needed to modify the Request interface of Express, can see it on src/@types/express/index.d.ts
+
+declare namespace Express {
+    interface Request {
+        userId: string;
+    }
+}
+
+
+
+npm install jest --save-dev
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",}
+
+
+npm install supertest --save-dev
+
+
+****************************************
+
+
+From here we will start the real codding
+
+
+*****************************************
+
+Create the Interface for Controllers src\utils\interfaces\controllerInterface.ts
+
+import { Router } from 'express';
+
+interface Controller{
+    path: string;
+    router: Router
+}
+
+export default Controller;
+
+
+All the controllers will follow this interface
+
+This way of doing it will considerer 2 main files
+the first is the app.ts, this one will be responsible for
+the abstraction for the express Application,
+it'll have implementations of manipulating controllers, 
+port number, starting middlewares, starting communication with database,
+
+The 2 file is the index.ts, it will create and initialize controllers for the instance of the app.ts
+
+the app.ts is as follows:
+
+import express, { Application } from 'express';
+import Controller from './utils/interfaces/controllerInterface';
+import helmet, { contentSecurityPolicy } from 'helmet';
+import cors from 'cors';
+import morgan from 'morgan';
+import mongoose from 'mongoose';
+
+class App {
+    public express: Application;
+    public port: Number;
+    public controllers: Controller[];
+
+    constructor(controllers: Controller[], port: Number) {
+        this.express = express();
+        this.port = port;
+        this.controllers = controllers;
+    }
+
+    public listen(listening = false): void {
+        if (listening) {
+            this.express.listen(this.port, () => {
+                console.log(`Listening on port ${this.port}`);
+            });
+        }
+
+        this.express.all('*', (req, res) => {
+            res.status(404).send({ message: 'Not Found.' });
+        });
+    }
+
+    public start(): void {
+        this.initialiseMiddleware();
+        this.initialiseControllers(this.controllers);
+        this.initialiseDatabaseConnection();
+    }
+
+    private initialiseMiddleware(): void {
+        this.express.use(helmet());
+        this.express.use(
+            helmet.contentSecurityPolicy({
+                useDefaults: false,
+            }),
+        );
+        this.express.use(cors());
+        this.express.use(morgan('dev'));
+        this.express.use(express.json());
+        this.express.use(express.urlencoded({ extended: false }));
+    }
+
+    private initialiseControllers(controller: Controller[]): void {
+        controller.forEach((controller: Controller) => {
+            console.log(controller.path);
+            this.express.use('/api', controller.router);
+        });
+    }
+
+    private initialiseDatabaseConnection(): void {
+        const { MONGO_USER, MONGO_PASSWORD, MONGO_PATH } = process.env;
+        console.log({ MONGO_USER, MONGO_PASSWORD, MONGO_PATH });
+        mongoose
+            .connect(`${MONGO_PATH}`, {
+                auth: {
+                    password: MONGO_PASSWORD,
+                    username: MONGO_USER,
+                },
+                authSource: 'admin',
+            })
+            .then(() => {
+                console.log('logged');
+            });
+    }
+}
+
+export default App;
+
+The index.ts is:
+
+import 'dotenv/config';
+import 'module-alias/register';
+import App from './app';
+import UserController from './resources/controllers/user/userController';
+import SystemStatusController from './resources/controllers/system/systemstatus';
+import LoginController from './resources/controllers/login/loginController';
+
+const userController = new UserController();
+const systemController = new SystemStatusController();
+const loginController = new LoginController();
+
+userController.initialiseRoutes();
+systemController.initialiseRoutes();
+loginController.initialiseRoutes();
+
+
+const app = new App(
+    [
+        systemController,
+        userController,
+        loginController,
+       
+    ],
+    process.env.PORT as any,
+);
+
+app.start();
+
+app.listen(true);
+
+
+Now, lets create the controllers systemController, userController, loginController
+
+The first one, systemController, it will just show the status of the server
+
+*******************************************************************************
+
+import Controller from '@/utils/interfaces/controllerInterface';
+import { Router, Request, Response } from 'express';
+import mongoose from 'mongoose';
+
+class SystemStatusController implements Controller {
+    path = '/system';
+    router: Router;
+    constructor() {
+        this.router = Router();
+    }
+    public async initialiseRoutes(): Promise<void> {
+        this.router.get(`${this.path}`, this.systemStatus);
+    }
+    public async systemStatus(req: Request, res: Response): Promise<any> {
+        return res.status(201).json({
+            data: {
+                srvStatus: 'running',
+                dbState: mongoose.STATES[mongoose.connection.readyState],
+            },
+        });
+    }
+}
+
+export default SystemStatusController;
+
+*******************************************************************************
+
+
+
+
+
+

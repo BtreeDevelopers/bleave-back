@@ -1,0 +1,218 @@
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Socket Thing1</title>
+        <style>
+            /* The side navigation menu */
+            .sidebar {
+                margin: 0;
+                padding: 0;
+                width: 200px;
+                background-color: #f1f1f1;
+                position: fixed;
+                height: 100%;
+                overflow: auto;
+            }
+
+            /* Sidebar links */
+            .sidebar a {
+                display: block;
+                color: black;
+                padding: 16px;
+                text-decoration: none;
+            }
+
+            /* Active/current link */
+            .sidebar a.active {
+                background-color: #04aa6d;
+                color: white;
+            }
+
+            /* Links on mouse-over */
+            .sidebar a:hover:not(.active) {
+                background-color: #555;
+                color: white;
+            }
+
+            /* Page content. The value of the margin-left property should match the value of the sidebar's width property */
+            div.content {
+                margin-left: 200px;
+                padding: 1px 16px;
+                height: 1000px;
+            }
+
+            /* On screens that are less than 700px wide, make the sidebar into a topbar 
+            @media screen and (max-width: 700px) {
+                .sidebar {
+                    width: 100%;
+                    height: auto;
+                    position: relative;
+                }
+                .sidebar a {
+                    float: left;
+                }
+                div.content {
+                    margin-left: 0;
+                }
+            }
+
+            /* On screens that are less than 400px, display the bar vertically, instead of horizontally
+            @media screen and (max-width: 400px) {
+                .sidebar a {
+                    text-align: center;
+                    float: none;
+                }
+            } */
+        </style>
+    </head>
+    <body>
+        <div>
+            <p id="myid"></p>
+        </div>
+        <div>
+            <label for="IDenvio">ID amigo:</label>
+            <input type="text" name="" id="IDenvio" />
+            <button onclick="addFriend()">Add amigo</button>
+        </div>
+        <div class="sidebar" id="sidebar"></div>
+
+        <!-- Page content -->
+        <div class="content">
+            <div>
+                <label for="message">Mensagem:</label>
+                <input type="text" name="" id="message" />
+                <button onclick="sendMessage()">Send Msg</button>
+            </div>
+
+            <div id="messages"></div>
+        </div>
+    </body>
+    <script>
+        let mmmm = Math.floor(Math.random() * Date.now() * 100000);
+        // Create WebSocket connection.
+        const socket = new WebSocket(
+            'ws://localhost:3001/?bearer=' + mmmm + '&userid=' + mmmm,
+        );
+
+        // const socket = new WebSocket('ws://localhost:3001/id=123456789');
+
+        let myId = '';
+        let friendId = '';
+        let activeTalks = [];
+        let talkToIndex = -1;
+
+        function changeTalk(ind) {
+            document.getElementById('messages').innerHTML = '';
+            if (talkToIndex !== -1) {
+                document
+                    .getElementById('p' + talkToIndex)
+                    .classList.remove('active');
+            }
+            talkToIndex = ind;
+            document.getElementById('p' + ind).classList.add('active');
+            friendId = activeTalks[ind].id;
+            let me = ' ';
+            activeTalks[ind].message.forEach((element) => {
+                me =
+                    element.sender != friendId
+                        ? 'style = background-color:blue;'
+                        : 'style = background-color:red;';
+                document.getElementById('messages').innerHTML +=
+                    '<p ' + me + '>' + element.message + '</p>';
+            });
+        }
+
+        function addFriend() {
+            let newIndex = parseInt(document.getElementById('IDenvio').value);
+
+            if (activeTalks.findIndex((item) => item.id === newIndex) === -1) {
+                activeTalks.push({ id: newIndex, message: [] });
+                document.getElementById('IDenvio').value = '';
+                updateSidebar();
+            }
+        }
+
+        function updateSidebar() {
+            document.getElementById('sidebar').innerHTML = '';
+            for (let i = 0; i < activeTalks.length; i++) {
+                document.getElementById('sidebar').innerHTML +=
+                    '<a id="p' +
+                    i +
+                    '" onclick="changeTalk(' +
+                    i +
+                    ')">' +
+                    activeTalks[i].id +
+                    '</a>';
+            }
+        }
+
+        // Connection opened
+        socket.addEventListener('open', function (event) {
+            console.log(event);
+            console.log('Connected to WS Server');
+        });
+
+        // Listen for messages
+        socket.addEventListener('message', function (event) {
+            // console.log('event.data:', event.data);
+            // console.log('type:', typeof event.data);
+            let jsonREsponse = JSON.parse(event.data);
+            console.log(jsonREsponse);
+            if (!jsonREsponse.id) {
+                if (
+                    activeTalks.findIndex(
+                        (item) => item.id === jsonREsponse.sender_id,
+                    ) === -1
+                ) {
+                    activeTalks.push({
+                        id: jsonREsponse.sender_id,
+                        message: [],
+                    });
+                    updateSidebar();
+                }
+                activeTalks[
+                    activeTalks.findIndex(
+                        (item) => item.id === jsonREsponse.sender_id,
+                    )
+                ].message.push({
+                    id: Date.now(),
+                    message: jsonREsponse.message,
+                    sender: jsonREsponse.sender_id,
+                });
+
+                console.log(jsonREsponse.message);
+                document.getElementById('messages').innerHTML +=
+                    '<p style = background-color:red;>' +
+                    jsonREsponse.message +
+                    '</p>';
+            } else {
+                jsonREsponse = JSON.parse(event.data);
+                myId = parseInt(jsonREsponse.id);
+                document.getElementById('myid').innerHTML = myId;
+            }
+        });
+
+        const sendMessage = () => {
+            const msm = document.getElementById('message').value;
+            console.log(activeTalks.findIndex((item) => item.id === friendId));
+            activeTalks[
+                activeTalks.findIndex((item) => item.id === friendId)
+            ].message.push({
+                id: Date.now(),
+                message: msm,
+                sender: myId,
+            });
+
+            document.getElementById('messages').innerHTML +=
+                '<p style = background-color:blue;>' + msm + '</p>';
+
+            let st = {
+                sender_id: myId,
+                reciver_id: friendId,
+                message: msm,
+            };
+            socket.send(JSON.stringify(st));
+        };
+    </script>
+</html>
