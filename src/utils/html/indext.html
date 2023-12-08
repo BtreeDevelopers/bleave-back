@@ -90,14 +90,15 @@
     </body>
     <script>
         let mmmm = Math.floor(Math.random() * Date.now() * 100000);
+        const myId = '64a376fe3f329afa140b444f';
+        let csfr = '5c2aebb9-b558-4c77-a0c9-973d4534bc29';
         // Create WebSocket connection.
         const socket = new WebSocket(
-            'ws://localhost:3001/?bearer=' + mmmm + '&userid=' + mmmm,
+            'ws://localhost:3001/?csfr=' + csfr + '&userid=' + myId,
         );
 
         // const socket = new WebSocket('ws://localhost:3001/id=123456789');
 
-        let myId = '';
         let friendId = '';
         let activeTalks = [];
         let talkToIndex = -1;
@@ -195,22 +196,22 @@
 
         const sendMessage = () => {
             const msm = document.getElementById('message').value;
-            console.log(activeTalks.findIndex((item) => item.id === friendId));
-            activeTalks[
-                activeTalks.findIndex((item) => item.id === friendId)
-            ].message.push({
-                id: Date.now(),
-                message: msm,
-                sender: myId,
-            });
+            // console.log(activeTalks.findIndex((item) => item.id === friendId));
+            // activeTalks[
+            //     activeTalks.findIndex((item) => item.id === friendId)
+            // ].message.push({
+            //     id: Date.now(),
+            //     message: msm,
+            //     sender: myId,
+            // });
 
             document.getElementById('messages').innerHTML +=
                 '<p style = background-color:blue;>' + msm + '</p>';
 
             let st = {
-                sender_id: myId,
-                reciver_id: friendId,
-                message: msm,
+                idConversa: '657397b12a4f5676e651d55e',
+                idSender: myId,
+                texto: msm,
             };
             socket.send(JSON.stringify(st));
         };

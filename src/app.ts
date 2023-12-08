@@ -50,7 +50,7 @@ class App {
     private initialiseControllers(controller: Controller[]): void {
         controller.forEach((controller: Controller) => {
             console.log(controller.path);
-            this.express.use('/api', controller.router);
+            this.express.use('/bleave', controller.router);
         });
     }
 

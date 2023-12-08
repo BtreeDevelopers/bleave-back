@@ -11,15 +11,18 @@ import LoginController from './resources/controllers/login/loginController';
 import accessModel from './resources/models/accessModel';
 import { descriptografar } from './utils/encript/encript';
 import loggedModel from './resources/models/loggedModel';
+import ConversasController from './resources/controllers/conversas/conversasController';
 
 const systemController = new SystemStatusController();
 const loginController = new LoginController();
+const conversaController = new ConversasController();
 
 systemController.initialiseRoutes();
 loginController.initialiseRoutes();
+conversaController.initialiseRoutes();
 
 const app = new App(
-    [systemController, loginController],
+    [systemController, loginController, conversaController],
     process.env.PORT as any,
 );
 
@@ -35,40 +38,50 @@ sf.onError();
 server.on(
     'upgrade',
     async function upgrade(request: any, socket: any, head: any) {
-        let carry = request.url.replace('/', '');
-        carry = carry.replace('?', '');
-        const carryParams = querystring.parse(carry);
+        try {
+            let carry = request.url.replace('/', '');
+            carry = carry.replace('?', '');
+            const carryParams = querystring.parse(carry);
 
-        const csfr = carryParams.csfr as string;
-        const userid = carryParams.userid as string;
+            const csfr = carryParams.csfr as string;
+            const userid = carryParams.userid as string;
 
-        const csrfMon = await accessModel.findOneAndDelete({
-            csfr: csfr,
-        });
+            const csrfMon = await accessModel.findOneAndDelete({
+                csfr: csfr,
+            });
 
-        const csrfDecriptografa = descriptografar({
-            encryptedData: csrfMon?.app,
-            iv: csrfMon?.iv,
-        });
+            const csrfDecriptografa = descriptografar({
+                encryptedData: csrfMon?.app,
+                iv: csrfMon?.iv,
+            });
 
-        if (
-            !csrfMon ||
-            csrfMon.expireAt < new Date().toISOString() ||
-            userid !== csrfDecriptografa
-        ) {
+            if (
+                !csrfMon ||
+                csrfMon.expireAt < new Date().toISOString() ||
+                userid !== csrfDecriptografa
+            ) {
+                socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                socket.destroy();
+            } else {
+                //req.socket.remoteAddress
+                const autorz = await loggedModel.create({
+                    csfr: csfr,
+                    ip: request.socket.remoteAddress,
+                    userid: userid,
+                    wsid: uuidv4(),
+                });
+                sf.wss.handleUpgrade(
+                    request,
+                    socket,
+                    head,
+                    function done(ws: any) {
+                        sf.wss.emit('connection', ws, request);
+                    },
+                );
+            }
+        } catch (error) {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
-        } else {
-            //req.socket.remoteAddress
-            const autorz = await loggedModel.create({
-                csfr: csfr,
-                ip: request.socket.remoteAddress,
-                userid: userid,
-                wsid: uuidv4(),
-            });
-            sf.wss.handleUpgrade(request, socket, head, function done(ws: any) {
-                sf.wss.emit('connection', ws, request);
-            });
         }
 
         // if (bearer === userid) {

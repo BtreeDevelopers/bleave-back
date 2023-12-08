@@ -38,6 +38,7 @@ class ConversasController implements Controller {
             nomeChat: nome_chat,
             membros: membros,
         });
+        console.log('');
         return res.status(200).json({ converas });
     }
 }

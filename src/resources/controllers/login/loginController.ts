@@ -9,6 +9,7 @@ import { bauth } from '@/utils/bauth/bauth';
 import { v4 as uuidv4 } from 'uuid';
 import { criptografar } from '@/utils/encript/encript';
 import accessModel from '@/resources/models/accessModel';
+import auth from '@/middleware/auth.middleware';
 
 class LoginController implements Controller {
     public path = '/login';
@@ -20,7 +21,7 @@ class LoginController implements Controller {
 
     public async initialiseRoutes(): Promise<void> {
         this.router.post(`${this.path}`, this.login);
-        this.router.post(`${this.path}/csfr`, this.criarCSFR);
+        this.router.post(`${this.path}/csrf`, auth, this.criarCSFR);
     }
 
     private async login(req: Request, res: Response): Promise<any> {
@@ -41,9 +42,9 @@ class LoginController implements Controller {
             const user = responseTokenUser.data;
 
             if (user._id === userId) {
-                const token_bjrd = generateToken({ id: userId });
+                const token_bleave = generateToken({ id: userId });
                 return res.status(200).json({
-                    token_bjrd,
+                    token_bleave,
                     _id: user._id,
                     nome: user.nome,
                     email: user.email,
@@ -69,17 +70,20 @@ class LoginController implements Controller {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
-            const bodydata = z.object({
-                userId: string(),
+            const loginUser = z.object({
+                bauthToken: string(),
             });
 
-            const { userId } = bodydata.parse(req.body);
+            const { bauthToken } = loginUser.parse(req.body);
+            bauth.defaults.headers.common = {
+                Authorization: `bearer ${bauthToken}`,
+            };
 
             const responseTokenUser = await bauth.get('/user');
 
             const user = responseTokenUser.data;
 
-            if (user._id !== userId) {
+            if (user._id !== req.userId) {
                 throw new Error('Param  error');
             }
 
@@ -88,7 +92,7 @@ class LoginController implements Controller {
             let expireAt = new Date();
             expireAt.setHours(expireAt.getHours() + 1);
 
-            let criptogra = criptografar(userId);
+            let criptogra = criptografar(user._id);
 
             accessModel.create({
                 csfr: keyToAccess,
