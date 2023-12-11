@@ -18,8 +18,10 @@ class ConversasController implements Controller {
     }
 
     private async getAllConversas(req: Request, res: Response): Promise<any> {
-        const converas = await conversasModel.find({ membros: req.userId });
-        return res.status(200).json({ converas });
+        const conversas = await conversasModel
+            .find({ membros: req.userId })
+            .sort({ 'mensagens.timestamps': -1 });
+        return res.status(200).json({ conversas });
     }
 
     private async postIniciarConversa(
@@ -27,19 +29,19 @@ class ConversasController implements Controller {
         res: Response,
     ): Promise<any> {
         const loginUser = z.object({
-            nome_chat: string(),
+            nome_chat: string().optional(),
             membros: z.array(z.string()),
         });
 
         const { nome_chat, membros } = loginUser.parse(req.body);
         membros.push(req.userId);
 
-        const converas = await conversasModel.create({
+        const conversas = await conversasModel.create({
             nomeChat: nome_chat,
             membros: membros,
         });
         console.log('');
-        return res.status(200).json({ converas });
+        return res.status(200).json({ conversas });
     }
 }
 export default ConversasController;

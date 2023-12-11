@@ -90,14 +90,13 @@
     </body>
     <script>
         let mmmm = Math.floor(Math.random() * Date.now() * 100000);
-        const myId = '64a376fe3f329afa140b444f';
-        let csfr = '5c2aebb9-b558-4c77-a0c9-973d4534bc29';
-        // Create WebSocket connection.
+        const userid = '64a6b96210e294a1c7cd736c';
+        const csfr = 'e31a03e5-9fcc-4b59-8bd7-541b30d1a5ad';
+        let wsid = '';
+        //Create WebSocket connection.
         const socket = new WebSocket(
-            'ws://localhost:3001/?csfr=' + csfr + '&userid=' + myId,
+            'ws://localhost:3001/?csfr=' + csfr + '&userid=' + userid,
         );
-
-        // const socket = new WebSocket('ws://localhost:3001/id=123456789');
 
         let friendId = '';
         let activeTalks = [];
@@ -160,7 +159,12 @@
             // console.log('type:', typeof event.data);
             let jsonREsponse = JSON.parse(event.data);
             console.log(jsonREsponse);
-            if (!jsonREsponse.id) {
+            if (jsonREsponse.status == 0) {
+                jsonREsponse = JSON.parse(event.data);
+                wsid = jsonREsponse.id;
+                document.getElementById('myid').innerHTML = wsid;
+            }
+            if (jsonREsponse.status == 1) {
                 if (
                     activeTalks.findIndex(
                         (item) => item.id === jsonREsponse.sender_id,
@@ -187,10 +191,6 @@
                     '<p style = background-color:red;>' +
                     jsonREsponse.message +
                     '</p>';
-            } else {
-                jsonREsponse = JSON.parse(event.data);
-                myId = parseInt(jsonREsponse.id);
-                document.getElementById('myid').innerHTML = myId;
             }
         });
 
@@ -209,8 +209,8 @@
                 '<p style = background-color:blue;>' + msm + '</p>';
 
             let st = {
-                idConversa: '657397b12a4f5676e651d55e',
-                idSender: myId,
+                idConversa: '65776258cbc20ad93dba0bf9',
+                idSender: wsid,
                 texto: msm,
             };
             socket.send(JSON.stringify(st));

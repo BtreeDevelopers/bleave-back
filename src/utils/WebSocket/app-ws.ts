@@ -47,6 +47,7 @@ class SocketFactory {
 
                 function welcome(ip: string, id: string): string {
                     let m = {
+                        status: 0,
                         message: 'Welcome New Client!',
                         id: id,
                     };
@@ -62,9 +63,18 @@ class SocketFactory {
                         const clients = SocketFactory.instance.wss.clients;
                         let messageFromUser = JSON.parse(message);
 
+                        const whosSend = await loggedModel.findOne({
+                            wsid: messageFromUser.idSender,
+                        });
+
+                        if (!whosSend) {
+                            console.log(messageFromUser.idSender);
+                            throw new Error('Não logado');
+                        }
+
                         let mensagemRecebida = {
                             idConversa: messageFromUser.idConversa,
-                            idSender: messageFromUser.idSender,
+                            idSender: whosSend.userid,
                             texto: messageFromUser.texto,
                             timestamps: Date.now(),
                         };
@@ -89,16 +99,29 @@ class SocketFactory {
 
                         const membros = conversa?.membros;
 
+                        const membrosLogados = await loggedModel.find({
+                            userid: { $in: membros },
+                        });
+
+                        let mensagemParaEnvio = {
+                            idConversa: messageFromUser.idConversa,
+                            idSender: whosSend.userid,
+                            texto: messageFromUser.texto,
+                            timestamps: Date.now(),
+                            status: 1,
+                        };
+
                         clients.forEach(function each(client: any) {
                             if (
                                 client !== ws &&
                                 client.readyState === WebSocket.OPEN
                             ) {
                                 //client.id in user[]
-                                membros?.forEach((element) => {
-                                    if (client.id == element) {
+                                membrosLogados?.forEach((element) => {
+                                    if (client.id == element.wsid) {
+                                        //verificar lista de membros logados
                                         client.send(
-                                            JSON.stringify(mensagemRecebida),
+                                            JSON.stringify(mensagemParaEnvio),
                                         );
                                     }
                                 });
