@@ -34,6 +34,7 @@ const server = require('http').createServer(app.express);
 const sf = new SocketFactory(server);
 sf.onConnection();
 sf.onError();
+//sf.onPing();
 
 server.on(
     'upgrade',

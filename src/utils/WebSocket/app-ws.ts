@@ -26,6 +26,36 @@ class SocketFactory {
         ws.send(`recebido!`);
     }
 
+    public onPing(): void {
+        const interval = setInterval(async function ping() {
+            const clientsWS = SocketFactory.instance.wss.clients;
+
+            let clientsIds = Array();
+            clientsWS.forEach(function each(client: any) {
+                clientsIds.push(client.id);
+            });
+
+            try {
+                if (clientsIds.length > 0) {
+                    await loggedModel.deleteMany({
+                        wsid: { $nin: clientsIds },
+                    });
+                }
+            } catch (error: any) {
+                console.log(error);
+                console.log(clientsIds);
+            }
+
+            // desconectados.forEach((element) => {
+            //     console.log(element);
+            // });
+        }, 60000);
+
+        SocketFactory.instance.wss.on('close', function close() {
+            clearInterval(interval);
+        });
+    }
+
     public onConnection(): void {
         SocketFactory.instance.wss.on(
             'connection',

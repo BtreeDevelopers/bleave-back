@@ -1,3 +1,4 @@
+import SocketFactory from '@/utils/WebSocket/app-ws';
 import Controller from '@/utils/interfaces/controllerInterface';
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
@@ -16,6 +17,7 @@ class SystemStatusController implements Controller {
             data: {
                 srvStatus: 'running',
                 dbState: mongoose.STATES[mongoose.connection.readyState],
+                wsclients: SocketFactory.instance.wss.clients.size,
             },
         });
     }

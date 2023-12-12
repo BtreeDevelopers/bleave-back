@@ -14,6 +14,7 @@ class ConversasController implements Controller {
 
     public async initialiseRoutes(): Promise<void> {
         this.router.get(`${this.path}`, auth, this.getAllConversas);
+        this.router.get(`${this.path}/id/:id`, auth, this.getConversasFromId);
         this.router.post(`${this.path}`, auth, this.postIniciarConversa);
     }
 
@@ -21,6 +22,22 @@ class ConversasController implements Controller {
         const conversas = await conversasModel
             .find({ membros: req.userId })
             .sort({ 'mensagens.timestamps': -1 });
+        return res.status(200).json({ conversas });
+    }
+    private async getConversasFromId(
+        req: Request,
+        res: Response,
+    ): Promise<any> {
+        if (!req.params.id || req.params.id === '') {
+            return res.status(500).json({ message: 'Missing Params' });
+        }
+
+        const conversas = await conversasModel
+            .find({
+                $and: [{ membros: req.userId }, { _id: req.params.id }],
+            })
+            .sort({ 'mensagens.timestamps': -1 });
+
         return res.status(200).json({ conversas });
     }
 
